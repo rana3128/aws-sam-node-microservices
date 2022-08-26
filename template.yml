@@ -1,0 +1,197 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: My serverless hello world API
+
+Parameters:
+  # Build variables
+  Stage:
+    Type: String
+  # Environment variables
+  # host:
+  #   Type: String
+  #   NoEcho: true
+  # database:
+  #   Type: String
+  #   NoEcho: true
+  # user:
+  #   Type: String
+  #   NoEcho: true
+  # password:
+  #   Type: String
+  #   NoEcho: true
+
+Globals:
+  Function:
+    Environment:
+      Variables:
+        host: !Ref host
+        user: !Ref user
+        database: !Ref database
+        password: !Ref password
+
+Resources:
+  ApiGatewayApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Stage
+
+  PrivateApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Stage
+      Auth:
+        DefaultAuthorizer: MyLambdaTokenAuthorizer
+        Authorizers: 
+          MyLambdaTokenAuthorizer:
+            FunctionArn: !GetAtt MyAuthFunction.Arn
+            Identity:
+              Headers:
+                - Authorization
+      
+  GetProductList:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers.getProductList
+      Runtime: nodejs16.x
+      MemorySize: 1024
+      Timeout: 20
+      Policies:
+        - AWSLambdaBasicExecutionRole
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /product
+            Method: get
+            RestApiId:
+              Ref: ApiGatewayApi
+
+  GetProduct:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers.getProduct
+      Runtime: nodejs16.x
+      MemorySize: 1024
+      Timeout: 20
+      Policies:
+        - AWSLambdaBasicExecutionRole
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /product/{id}
+            Method: get
+            RestApiId:
+              Ref: ApiGatewayApi
+
+  AddToCart:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers.addToCart
+      Runtime: nodejs16.x
+      MemorySize: 1024
+      Timeout: 20
+      Policies:
+        - AWSLambdaBasicExecutionRole
+      Environment: 
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /cart
+            Method: post
+            RestApiId:
+              Ref: PrivateApiGateway
+
+  RemoveFromCart:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers.removeFromCart
+      Runtime: nodejs16.x
+      MemorySize: 1024
+      Timeout: 20
+      Policies:
+        - AWSLambdaBasicExecutionRole
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /cart
+            Method: delete
+            RestApiId:
+              Ref: PrivateApiGateway
+
+  GetCart:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers.getCart
+      Runtime: nodejs16.x
+      MemorySize: 1024
+      Timeout: 20
+      Policies:
+        - AWSLambdaBasicExecutionRole
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /cart/{id}
+            Method: get
+            RestApiId:
+              Ref: PrivateApiGateway
+
+  AddUser:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers.createUser
+      Runtime: nodejs16.x
+      MemorySize: 1024
+      Timeout: 20
+      Policies:
+        - AWSLambdaBasicExecutionRole
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /user
+            Method: post
+            RestApiId:
+              Ref: ApiGatewayApi
+  Login:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers.loginUser
+      Runtime: nodejs16.x
+      MemorySize: 1024
+      Timeout: 20
+      Policies:
+        - AWSLambdaBasicExecutionRole
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /login
+            Method: post
+            RestApiId:
+              Ref: ApiGatewayApi
+    
+  MyAuthFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      CodeUri: src/
+      Handler: handlers.validateUser
+      Runtime: nodejs16.x
+
+Outputs:
+  ApiGatewayApi:
+    Description: "API Gateway endpoint URL for Prod stage"
+    Value: !Sub "https://${ApiGatewayApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+  GetProductList:
+    Description: "GetProductList Lambda Function ARN"
+    Value: !GetAtt GetProductList.Arn
